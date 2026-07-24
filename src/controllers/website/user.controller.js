@@ -17,6 +17,8 @@ const viewProfile = (req, res) => {
     }
 
 }
+
+
 // Route: GET /api/user?search=anil
 const getUsers = async (req, res) => {
     try {

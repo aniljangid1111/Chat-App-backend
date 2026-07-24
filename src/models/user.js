@@ -16,16 +16,14 @@ const userSchema = mongoose.Schema(
         },
         thumbnail: {
             type: String,
-            required: true,
-            default: "https://icon-library.com/images/anonymous-avatar-icon/anonymous-avatar-icon-25.jpg", 
         },
         status: {
             type: Boolean,
             default: 1,
-        }, 
+        },
         created_at: {
             type: Date,
-            default: Date.now()  
+            default: Date.now()
         },
         updated_at: {
             type: Date,

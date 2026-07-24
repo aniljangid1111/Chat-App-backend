@@ -21,9 +21,9 @@ const storage = (folderName) => multer.diskStorage({
 });
 
 // ✅ WITH FILE (register)
-const uploadWithImage = (folderName) =>
+const uploadWithImage = (folderName, fieldName = "thumbnail") =>
     multer({ storage: storage(folderName) }).fields([
-        { name: 'thumbnail', maxCount: 1 }
+        { name: fieldName, maxCount: 1 }
     ]);
 
 // ✅ WITHOUT FILE (login)

@@ -9,6 +9,9 @@ const chatSchema = mongoose.Schema({
         type: Boolean,
         default: false
     },
+    groupImage: {
+        type: String,
+    },
     user: [
         {
             type: mongoose.Schema.Types.ObjectId,

@@ -1,5 +1,8 @@
 const Chat = require("../../models/chat");
 const userModels = require("../../models/user");
+const fs = require("fs");
+const path = require("path");
+const { deleteFile } = require("../../utils/fileHelper");
 
 const accessChat = async (req, res) => {
 
@@ -33,7 +36,11 @@ const accessChat = async (req, res) => {
 
     // ✅ If chat exists
     if (isChat.length > 0) {
-        res.send(isChat[0]);
+        return res.status(200).json({
+            _status: true,
+            _message: "success",
+            _data: isChat[0],
+        });
     }
     else {
 
@@ -77,8 +84,8 @@ const fetchChats = async (req, res) => {
             .sort({ updatedAt: -1 })
             .then(async (results) => {
                 results = await userModels.populate(results, {
-                    path: 'latestMessage',
-                    select: 'name pic email'
+                    path: "latestMessage.sender",
+                    select: "name email thumbnail"
                 })
                 res.status(200).json({
                     _status: true,
@@ -104,13 +111,19 @@ const createGroupChat = async (req, res) => {
         });
     }
 
-    var users = req.body.user;
+    var users = JSON.parse(req.body.user);
 
     if (users.length < 2) {
         return res.status(400).json({
             _status: false,
             _message: "At least 2 users are required to form a group chat",
         });
+    }
+
+    let groupImage;
+
+    if (req.files?.groupImage?.length > 0) {
+        groupImage = `${req.protocol}://${req.get("host")}/uploads/group/${req.files.groupImage[0].filename}`;
     }
 
     users.push(req.user._id);
@@ -121,6 +134,7 @@ const createGroupChat = async (req, res) => {
             user: users,
             isGroupChat: true,
             groupAdmin: req.user._id,
+            groupImage
         });
 
         const fullGroupChat = await Chat.findById(groupChat._id)
@@ -145,30 +159,44 @@ const createGroupChat = async (req, res) => {
 const renameGroup = async (req, res) => {
     const { chatId, chatName } = req.body;
 
+    const chat = await Chat.findById(chatId);
+
+    if (!chat) {
+        return res.status(404).json({
+            _status: false,
+            _message: "Chat not found",
+        });
+    }
+
+    const updateData = {};
+
+    if (chatName) {
+        updateData.chatName = chatName;
+    }
+
+    if (req.files?.groupImage?.length > 0) {
+
+        // deleteFile(chat.groupImage, "group");
+        deleteFile(chat.groupImage);
+
+        updateData.groupImage =
+            `${req.protocol}://${req.get("host")}/uploads/group/${req.files.groupImage[0].filename}`;
+    }
+
     const updateChat = await Chat.findByIdAndUpdate(
         chatId,
-        {
-            chatName
-        },
-        {
-            new: true
-        }
+        updateData,
+        { new: true }
     )
         .populate("user", "-password")
         .populate("groupAdmin", "-password");
 
-    if (!updateChat) {
-        return res.status(404).json({
-            _message: 'Chat not found'
-        })
-    }
-
     return res.status(200).json({
         _status: true,
-        _message: "Group renamed successfully",
+        _message: "Group updated successfully",
         _data: updateChat,
     });
-}
+};
 
 const addtoGroup = async (req, res) => {
     const { chatId, userId } = req.body;
@@ -226,7 +254,107 @@ const removeFromeGroup = async (req, res) => {
     });
 }
 
+const updateGroupMembers = async (req, res) => {
+    try {
+        const {
+            chatId,
+            addUsers = [],
+            removeUsers = [],
+        } = req.body;
+
+        // Validation
+        if (!chatId) {
+            return res.status(400).json({
+                _status: false,
+                _message: "chatId is required",
+            });
+        }
+
+        // Find chat
+        const chat = await Chat.findById(chatId);
+
+        if (!chat) {
+            return res.status(404).json({
+                _status: false,
+                _message: "Chat not found",
+            });
+        }
+
+        // Group check
+        if (!chat.isGroupChat) {
+            return res.status(400).json({
+                _status: false,
+                _message: "This is not a group chat",
+            });
+        }
+
+        // Admin check
+        if (chat.groupAdmin.toString() !== req.user._id.toString()) {
+            return res.status(403).json({
+                _status: false,
+                _message: "Only group admin can update members",
+            });
+        }
+
+        // Remove duplicate ids
+        const addIds = [...new Set(addUsers)];
+        const removeIds = [...new Set(removeUsers)];
+
+        // Same user add & remove
+        const conflict = addIds.some(id => removeIds.includes(id));
+
+        if (conflict) {
+            return res.status(400).json({
+                _status: false,
+                _message: "Same user cannot be added and removed together",
+            });
+        }
+
+        // Admin remove protection
+        if (removeIds.includes(chat.groupAdmin.toString())) {
+            return res.status(400).json({
+                _status: false,
+                _message: "Group admin cannot be removed",
+            });
+        }
+
+        // Current members
+        let members = chat.user.map(id => id.toString());
+
+        // Remove users
+        members = members.filter(id => !removeIds.includes(id));
+
+        // Add users (ignore duplicates)
+        addIds.forEach(id => {
+            if (!members.includes(id)) {
+                members.push(id);
+            }
+        });
+
+        // Save
+        chat.user = members;
+        await chat.save();
+
+        // Populate updated chat
+        const updatedChat = await Chat.findById(chat._id)
+            .populate("user", "-password")
+            .populate("groupAdmin", "-password");
+
+        return res.status(200).json({
+            _status: true,
+            _message: "Group members updated successfully",
+            _data: updatedChat,
+        });
+
+    } catch (error) {
+        return res.status(500).json({
+            _status: false,
+            _message: error.message,
+        });
+    }
+};
+
 // now UI make we complete 10 no playlist video
 
 
-module.exports = { accessChat, fetchChats, createGroupChat, renameGroup, removeFromeGroup, addtoGroup };
+module.exports = { accessChat, fetchChats, createGroupChat, renameGroup, removeFromeGroup, addtoGroup, updateGroupMembers };

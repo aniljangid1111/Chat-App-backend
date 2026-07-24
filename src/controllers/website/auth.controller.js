@@ -39,6 +39,7 @@ const registerUser = async (req, res) => {
         if (req.files?.thumbnail) {
             thumbnailPath = `${req.protocol}://${req.get('host')}/uploads/profile/${req.files.thumbnail[0].filename}`;
         }
+        
 
         let user = await User.create({
             name,
@@ -101,7 +102,9 @@ const loginUser = async (req, res) => {
         }
 
         // Token Gen..
-        const token = generateToken({ id: user._id })
+        const token = generateToken({ id: user._id }) 
+
+        // delete user._doc.password
 
         res.status(200).json({
             _status: true,
