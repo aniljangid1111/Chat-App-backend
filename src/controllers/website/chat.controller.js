@@ -198,61 +198,6 @@ const renameGroup = async (req, res) => {
     });
 };
 
-const addtoGroup = async (req, res) => {
-    const { chatId, userId } = req.body;
-
-    const addUser = await Chat.findByIdAndUpdate(
-        chatId,
-        {
-            $push: { user: userId }
-        },
-        {
-            new: true
-        }
-    )
-        .populate("user", "-password")
-        .populate("groupAdmin", "-password");
-
-    if (!addUser) {
-        return res.status(404).json({
-            _message: 'Chat not found'
-        })
-    }
-
-    return res.status(200).json({
-        _status: true,
-        _message: "User Added successfully",
-        _data: addUser
-    });
-}
-
-const removeFromeGroup = async (req, res) => {
-    const { chatId, userId } = req.body;
-
-    const removeUser = await Chat.findByIdAndUpdate(
-        chatId,
-        {
-            $pull: { user: userId }
-        },
-        {
-            new: true
-        }
-    )
-        .populate("user", "-password")
-        .populate("groupAdmin", "-password");
-
-    if (!removeUser) {
-        return res.status(404).json({
-            _message: 'Chat not found'
-        })
-    }
-
-    return res.status(200).json({
-        _status: true,
-        _message: "User Remove successfully",
-        _data: removeUser
-    });
-}
 
 const updateGroupMembers = async (req, res) => {
     try {
@@ -354,7 +299,153 @@ const updateGroupMembers = async (req, res) => {
     }
 };
 
-// now UI make we complete 10 no playlist video
+const leaveGroup = async (req, res) => {
+    try {
+        const { chatId } = req.body;
+
+        if (!chatId) {
+            return res.status(400).json({
+                _status: false,
+                _message: "chatId is required",
+            });
+        }
+
+        const chat = await Chat.findById(chatId);
+
+        if (!chat) {
+            return res.status(404).json({
+                _status: false,
+                _message: "Chat not found",
+            });
+        }
+
+        if (!chat.isGroupChat) {
+            return res.status(400).json({
+                _status: false,
+                _message: "This is not a group chat",
+            });
+        }
+
+        const userId = req.user._id.toString();
+
+        // Check member
+        if (!chat.user.some(id => id.toString() === userId)) {
+            return res.status(400).json({
+                _status: false,
+                _message: "You are not a member of this group",
+            });
+        }
+
+        // Remove current user
+        chat.user = chat.user.filter(
+            id => id.toString() !== userId
+        );
+
+        // If admin left
+        if (chat.groupAdmin.toString() === userId) {
+
+            // No members left
+            if (chat.user.length === 0) {
+
+                if (chat.groupImage) {
+                    deleteFile(chat.groupImage);
+                }
+
+                await Chat.findByIdAndDelete(chatId);
+
+                return res.status(200).json({
+                    _status: true,
+                    _message: "Group deleted successfully",
+                    _data: null,
+                });
+            }
+
+            // Assign next member as admin
+            const nextAdmin = chat.user.find(
+                id => id.toString() !== userId
+            );
+
+            chat.groupAdmin = nextAdmin;
+        }
+
+        await chat.save();
+
+        const updatedChat = await Chat.findById(chat._id)
+            .populate("user", "-password")
+            .populate("groupAdmin", "-password");
+
+        return res.status(200).json({
+            _status: true,
+            _message: "You left the group successfully",
+            _data: updatedChat,
+        });
+
+    } catch (error) {
+
+        return res.status(500).json({
+            _status: false,
+            _message: error.message,
+        });
+
+    }
+};
+
+const deleteGroup = async (req, res) => {
+
+    try {
+        const { chatId } = req.body;
+
+        if (!chatId) {
+            return res.status(400).json({
+                _status: false,
+                _message: "Chat Id Is Required"
+            })
+        }
+
+        const chat = await Chat.findById(chatId);
+
+        if (!chat) {
+            return res.status(404).json({
+                _status: false,
+                _message: "Chat not found"
+            })
+        }
+
+        if (!chat.isGroupChat) {
+            return res.status(400).json({
+                _status: false,
+                _message: "This is not a group chat"
+            })
+        }
+
+        if (chat.groupAdmin.toString() !== req.user._id.toString()) {
+            return res.status(403).json({
+                _status: false,
+                _message: "Only group admin can delete this group",
+            });
+        }
+
+        // Group Img delete
+        if (chat.groupImage) {
+            deleteFile(chat.groupImage)
+        }
+
+        await Chat.findByIdAndDelete(chatId);
+
+        return res.status(200).json({
+            _status: true,
+            _message: "Group deleted successfully",
+            _data: null,
+        });
+    } catch (error) {
+        return res.status(500).json({
+            _status: false,
+            _message: error.message,
+        });
+    }
+
+}
 
 
-module.exports = { accessChat, fetchChats, createGroupChat, renameGroup, removeFromeGroup, addtoGroup, updateGroupMembers };
+
+module.exports = { accessChat, fetchChats, createGroupChat, renameGroup, updateGroupMembers, leaveGroup, deleteGroup };

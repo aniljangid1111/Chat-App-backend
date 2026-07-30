@@ -17,6 +17,15 @@ const userSchema = mongoose.Schema(
         thumbnail: {
             type: String,
         },
+        lastSeen: {
+            type: Date,
+            default: null,
+        },
+
+        isOnline: {
+            type: Boolean,
+            default: 1,
+        },
         status: {
             type: Boolean,
             default: 1,

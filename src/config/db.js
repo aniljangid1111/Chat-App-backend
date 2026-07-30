@@ -9,5 +9,5 @@ mongoose.connect(url)
         console.log('Mongoos connected');
     })
     .catch((err) => {
-        console.log(err.message);
+        console.log(err.message); 
     }) 

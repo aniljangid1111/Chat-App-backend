@@ -22,6 +22,19 @@ const chatSchema = mongoose.Schema({
         type: mongoose.Schema.Types.ObjectId,
         ref: "Messages"
     },
+    unreadCounts: [
+        {
+            user: {
+                type: mongoose.Schema.Types.ObjectId,
+                ref: "Users",
+            },
+
+            count: {
+                type: Number,
+                default: 0,
+            },
+        },
+    ],
     groupAdmin: {
         type: mongoose.Schema.Types.ObjectId,
         ref: "Users"

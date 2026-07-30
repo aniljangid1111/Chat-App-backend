@@ -6,7 +6,7 @@ const generateToken = (payload, expiresIn = "7d") => {
 };
 
 const verifyToken = (token) => {
-    console.log('Verify==>>', token)
+    // console.log('Verify==>>', token)
     return jwt.verify(token, process.env.JWT_SECRET)
 }
 
