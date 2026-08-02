@@ -45,9 +45,21 @@ const accessChat = async (req, res) => {
     else {
 
         let chatData = {
-            chatName: 'sender',
+            chatName: "sender",
             isGroupChat: false,
-            user: [req.user._id, userId]
+
+            user: [req.user._id, userId],
+
+            unreadCounts: [
+                {
+                    user: req.user._id,
+                    count: 0,
+                },
+                {
+                    user: userId,
+                    count: 0,
+                },
+            ],
         };
 
         try {
@@ -127,11 +139,16 @@ const createGroupChat = async (req, res) => {
     }
 
     users.push(req.user._id);
+    const unreadCounts = users.map(user => ({
+        user,
+        count: 0,
+    }));
 
     try {
         const groupChat = await Chat.create({
             chatName: req.body.name,
             user: users,
+            unreadCounts,
             isGroupChat: true,
             groupAdmin: req.user._id,
             groupImage

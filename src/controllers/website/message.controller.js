@@ -1,6 +1,7 @@
-const Chat = require('../../models/chat');
+const Chat = require('../../models/chat.js');
 const Message = require('../../models/message.js');
-const User = require('../../models/user');
+const User = require('../../models/user.js');
+const Notification = require("../../models/notification.js");
 
 
 
@@ -28,31 +29,102 @@ const sendMessage = async (req, res) => {
             select: 'name thumbnail email'
         })
 
-        await Chat.findByIdAndUpdate(req.body.chatId, {
-            latestMessage: message
-        })
+        // await Chat.findByIdAndUpdate(req.body.chatId, {
+        //     latestMessage: message
+        // })
+
+        await Chat.findByIdAndUpdate(
+            chatId,
+            {
+                latestMessage: message._id,
+            }
+        );
+
+        await Chat.updateOne(
+            { _id: chatId },
+            {
+                $inc: {
+                    "unreadCounts.$[elem].count": 1,
+                },
+            },
+            {
+                arrayFilters: [
+                    {
+                        "elem.user": {
+                            $ne: req.user._id,
+                        },
+                    },
+                ],
+            }
+        );
+
+        // Create notification for every receiver except sender
+        const notificationDocs = message.chat.user
+            .filter(
+                receiver =>
+                    receiver._id.toString() !== req.user._id.toString()
+            )
+            .map(receiver => ({
+                sender: req.user._id,
+                receiver: receiver._id,
+                chat: chatId,
+                message: message._id,
+
+                title: message.chat.isGroupChat
+                    ? message.chat.chatName
+                    : message.sender.name,
+
+                body: message.content,
+
+                type: "message",
+            }));
+
+        const notifications = await Notification.insertMany(notificationDocs);
+
+
 
         const io = req.app.get("io");
 
-        // message.chat.user.forEach((user) => {
 
-        //     console.log("Emit To:", user._id.toString());
+        message.chat.user.forEach((receiver) => {
 
-        //     if (user._id.toString() === message.sender._id.toString()) {
-        //         console.log("Skip Sender");
-        //         return;
-        //     }
+            const room = receiver._id.toString();
 
-        //     console.log("Sending To:", user._id.toString());
+            // realtime message
+            io.to(room).emit("message received", message);
 
-        //     io.to(user._id.toString()).emit("message received", message);
-        // });
+            // realtime notification
+            if (receiver._id.toString() !== req.user._id.toString()) {
 
-        message.chat.user.forEach((user) => {
+                const notification = notifications.find(
+                    n => n.receiver.toString() === room
+                );
 
-            console.log("Sending To:", user._id.toString());
+                io.to(room).emit("notification received", {
+                    _id: notification._id,
+                    sender: message.sender,
 
-            io.to(user._id.toString()).emit("message received", message);
+                    receiver: room,
+
+                    chat: {
+                        _id: message.chat._id,
+                        chatName: message.chat.chatName,
+                        isGroupChat: message.chat.isGroupChat,
+                        groupImage: message.chat.groupImage,
+                    },
+
+                    message: {
+                        _id: message._id,
+                        content: message.content,
+                    },
+
+                    title: notification.title,
+                    body: notification.body,
+                    type: notification.type,
+                    isRead: notification.isRead,
+                    createdAt: notification.createdAt,
+                });
+            }
 
         });
 
@@ -78,7 +150,7 @@ const fetchAllMessages = async (req, res) => {
         // Check user is part of this chat
         const chat = await Chat.findOne({
             _id: chatId,
-            users: req.user._id,
+            user: req.user._id,
         });
 
         // if (!chat) {
@@ -88,10 +160,27 @@ const fetchAllMessages = async (req, res) => {
         //     });
         // }
 
+        await Chat.updateOne(
+            { _id: chatId },
+            {
+                $set: {
+                    "unreadCounts.$[elem].count": 0,
+                },
+            },
+            {
+                arrayFilters: [
+                    {
+                        "elem.user": req.user._id,
+                    },
+                ],
+            }
+        );
+
         const messages = await Message.find({ chat: chatId })
             .populate("sender", "name thumbnail email")
             .populate("chat")
             .sort({ createdAt: 1 });
+
 
         return res.status(200).json({
             _status: true,
