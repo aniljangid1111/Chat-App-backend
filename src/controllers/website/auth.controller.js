@@ -10,6 +10,19 @@ const registerUser = async (req, res) => {
     try {
         const { password, name, email } = req.body
 
+        // Email validation
+        if (email !== undefined) {
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+            if (!emailRegex.test(email)) {
+                return res.status(400).json({
+                    _status: false,
+                    _message: "Invalid email address",
+                    _data: null
+                });
+            }
+        }
+
         const existingUser = await User.findOne({ email: email, delete_at: null });
 
         // checking user have or not
@@ -39,7 +52,7 @@ const registerUser = async (req, res) => {
         if (req.files?.thumbnail) {
             thumbnailPath = `${req.protocol}://${req.get('host')}/uploads/profile/${req.files.thumbnail[0].filename}`;
         }
-        
+
 
         let user = await User.create({
             name,
@@ -69,6 +82,19 @@ const registerUser = async (req, res) => {
 const loginUser = async (req, res) => {
     try {
         const { password, email } = req.body
+
+        // Email validation
+        if (email !== undefined) {
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+            if (!emailRegex.test(email)) {
+                return res.status(400).json({
+                    _status: false,
+                    _message: "Invalid email address",
+                    _data: null
+                });
+            }
+        }
 
         // 1️⃣ Validation
         if (!email || !password) {
@@ -102,7 +128,7 @@ const loginUser = async (req, res) => {
         }
 
         // Token Gen..
-        const token = generateToken({ id: user._id }) 
+        const token = generateToken({ id: user._id })
 
         // delete user._doc.password
 

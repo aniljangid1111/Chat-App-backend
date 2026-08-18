@@ -5,12 +5,13 @@ const { sendMessage, fetchAllMessages } = require("./website/message.controller"
 const { getNotifications, markAsRead, markAllAsRead, deleteNotification, clearNotifications, markChatNotificationsRead } = require("./website/notification.controller");
 
 // User
-const { viewProfile, getUsers } = require("./website/user.controller");
+const { viewProfile, getUsers, updateProfile } = require("./website/user.controller");
 
 module.exports = {
   registerUser,
   loginUser,
   viewProfile,
+  updateProfile,
   getUsers,
   accessChat,
   fetchChats,
